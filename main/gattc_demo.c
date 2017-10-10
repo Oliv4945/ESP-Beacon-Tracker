@@ -36,6 +36,7 @@
 #include "lwip/sockets.h"
 #include "lwip/dns.h"
 #include "lwip/netdb.h"
+#include "mqtt.h"
 
 #include "bt.h"
 #include "esp_gap_ble_api.h"
@@ -65,7 +66,7 @@ static bool get_server = false;
 static esp_gattc_char_elem_t *char_elem_result   = NULL;
 static esp_gattc_descr_elem_t *descr_elem_result = NULL;
 
-/* eclare static functions */
+/* Declare static functions */
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 static void esp_gattc_cb(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
 static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_t gattc_if, esp_ble_gattc_cb_param_t *param);
@@ -466,6 +467,82 @@ static void initialise_wifi(void)
     ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
     ESP_ERROR_CHECK( esp_wifi_start() );
 }
+
+
+void connected_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+    mqtt_client *client = (mqtt_client *)self;
+    mqtt_subscribe(client, "/test", 0);
+    mqtt_publish(client, "/test", "howdy!", 6, 0, 0);
+}
+void disconnected_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+
+}
+void reconnect_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+
+}
+void subscribe_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+    ESP_LOGI(GATTC_TAG, "[APP] Subscribe ok, test publish msg");
+    mqtt_client *client = (mqtt_client *)self;
+    mqtt_publish(client, "/test", "abcde", 5, 0, 0);
+}
+
+void publish_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+
+}
+void data_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+    // TODO mqtt_client *client = (mqtt_client *)self;
+    mqtt_event_data_t *event_data = (mqtt_event_data_t *)params;
+
+    if(event_data->data_offset == 0) {
+
+        char *topic = malloc(event_data->topic_length + 1);
+        memcpy(topic, event_data->topic, event_data->topic_length);
+        topic[event_data->topic_length] = 0;
+        ESP_LOGI(GATTC_TAG, "[APP] Publish topic: %s", topic);
+        free(topic);
+    }
+
+    // char *data = malloc(event_data->data_length + 1);
+    // memcpy(data, event_data->data, event_data->data_length);
+    // data[event_data->data_length] = 0;
+    ESP_LOGI(GATTC_TAG, "[APP] Publish data[%d/%d bytes]",
+             event_data->data_length + event_data->data_offset,
+             event_data->data_total_length);
+    // data);
+
+    // free(data);
+
+}
+
+mqtt_settings settings = {
+    .host = "test.mosquitto.org",
+#if defined(CONFIG_MQTT_SECURITY_ON)
+    .port = 8883, // encrypted
+#else
+    .port = 1883, // unencrypted
+#endif
+    .client_id = "mqtt_client_id",
+    .username = "user",
+    .password = "pass",
+    .clean_session = 0,
+    .keepalive = 120,
+    .lwt_topic = "/lwt",
+    .lwt_msg = "offline",
+    .lwt_qos = 0,
+    .lwt_retain = 0,
+    .connected_cb = connected_cb,
+    .disconnected_cb = disconnected_cb,
+    // TODO .reconnect_cb = reconnect_cb,
+    .subscribe_cb = subscribe_cb,
+    .publish_cb = publish_cb,
+    .data_cb = data_cb
+};
 
 
 void app_main()
