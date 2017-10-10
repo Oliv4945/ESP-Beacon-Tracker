@@ -1,0 +1,6 @@
+build/
+sdkconfig*
+*.swp
+*.me
+*.bak
+*.old
