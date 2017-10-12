@@ -31,6 +31,9 @@
 #include "nvs_flash.h"
 #include "controller.h"
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
+
 #include "esp_wifi.h"
 #include "esp_event_loop.h"
 #include "lwip/sockets.h"
@@ -46,6 +49,8 @@
 #include "esp_gatt_common_api.h"
 
 #define GATTC_TAG "GATTC_DEMO"
+#define TAG_WIFI "WIFI"
+#define TAG_MQTT "MQTT"
 #define REMOTE_SERVICE_UUID        0x00FF
 #define REMOTE_NOTIFY_CHAR_UUID    0xFF01
 #define PROFILE_NUM      1
@@ -65,6 +70,13 @@ static bool connect    = false;
 static bool get_server = false;
 static esp_gattc_char_elem_t *char_elem_result   = NULL;
 static esp_gattc_descr_elem_t *descr_elem_result = NULL;
+
+mqtt_client *mqtt_c = NULL;
+
+// FreeRTOS event group to signal when we are connected & ready to send data
+EventGroupHandle_t network_event_group;
+const int WIFI_CONNECTED = BIT0;
+const int MQTT_CONNECTED = BIT1;
 
 /* Declare static functions */
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
@@ -104,6 +116,88 @@ struct gattc_profile_inst {
     uint16_t service_end_handle;
     uint16_t char_handle;
     esp_bd_addr_t remote_bda;
+};
+
+
+void connected_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+    xEventGroupSetBits(network_event_group, MQTT_CONNECTED);
+    ESP_LOGW(TAG_MQTT, "Connected_cb");
+    mqtt_client *client = (mqtt_client *)self;
+    mqtt_subscribe(client, "/test", 0);
+    // mqtt_publish(client, "/test", "howdy!", 6, 0, 0);
+}
+void disconnected_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+    xEventGroupClearBits(network_event_group, MQTT_CONNECTED);
+    ESP_LOGW(TAG_MQTT, "Disconnected_cb");
+}
+void reconnect_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+
+}
+void subscribe_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+    ESP_LOGW(TAG_MQTT, "[APP] Subscribe ok, test publish msg");
+    mqtt_client *client = (mqtt_client *)self;
+    mqtt_publish(client, "/test", "abcde", 5, 0, 0);
+}
+
+void publish_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+    ESP_LOGW(TAG_MQTT, "Publish_cb");
+    mqtt_client *client = (mqtt_client *)self;
+    mqtt_publish(client, "/test", "abcde", 5, 0, 0);
+}
+void data_cb(mqtt_client *self, mqtt_event_data_t *params)
+{
+    // TODO mqtt_client *client = (mqtt_client *)self;
+    mqtt_event_data_t *event_data = (mqtt_event_data_t *)params;
+
+    if(event_data->data_offset == 0) {
+
+        char *topic = malloc(event_data->topic_length + 1);
+        memcpy(topic, event_data->topic, event_data->topic_length);
+        topic[event_data->topic_length] = 0;
+        ESP_LOGI(GATTC_TAG, "[APP] Publish topic: %s", topic);
+        free(topic);
+    }
+
+    // char *data = malloc(event_data->data_length + 1);
+    // memcpy(data, event_data->data, event_data->data_length);
+    // data[event_data->data_length] = 0;
+    ESP_LOGI(GATTC_TAG, "[APP] Publish data[%d/%d bytes]",
+             event_data->data_length + event_data->data_offset,
+             event_data->data_total_length);
+    // data);
+
+    // free(data);
+
+}
+
+mqtt_settings settings = {
+    .host = "HOST OR IP",
+#if defined(CONFIG_MQTT_SECURITY_ON)
+    .port = 8883, // encrypted
+#else
+
+    .port = 1883, // unencrypted
+#endif
+    .client_id = "mqtt_client_id",
+    .username = "username",
+    .password = "password",
+    .clean_session = 0,
+    .keepalive = 120,
+    .lwt_topic = "/lwt",
+    .lwt_msg = "offline",
+    .lwt_qos = 0,
+    .lwt_retain = 0,
+    .connected_cb = connected_cb,
+    .disconnected_cb = disconnected_cb,
+    // TODO .reconnect_cb = reconnect_cb,
+    .subscribe_cb = subscribe_cb,
+    .publish_cb = publish_cb,
+    .data_cb = data_cb
 };
 
 /* One gatt-based profile one app_id and one gattc_if, this array will store the gattc_if returned by ESP_GATTS_REG_EVT */
@@ -324,9 +418,12 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
     uint8_t adv_name_len = 0;
     switch (event) {
     case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT: {
+        // TODO infinite timeout on return value
+        xEventGroupWaitBits(network_event_group, WIFI_CONNECTED | MQTT_CONNECTED, false, true, 0xFFFF);
+        ESP_LOGW(GATTC_TAG, "Starting scan");
         //the unit of the duration is second
-        uint32_t duration = 30;
-        esp_ble_gap_start_scanning(duration);
+	uint32_t duration = 3;
+	esp_ble_gap_start_scanning(duration);
         break;
     }
     case ESP_GAP_BLE_SCAN_START_COMPLETE_EVT:
@@ -347,7 +444,58 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
             adv_name = esp_ble_resolve_adv_data(scan_result->scan_rst.ble_adv,
                                                 ESP_BLE_AD_TYPE_NAME_CMPL, &adv_name_len);
             ESP_LOGI(GATTC_TAG, "searched Device Name Len %d", adv_name_len);
-            esp_log_buffer_char(GATTC_TAG, adv_name, adv_name_len);
+            /* From Wikipedia
+	     *
+	     * Byte 3: Length: 0x1a
+	     * Byte 4: Type: 0xff (Custom Manufacturer Packet)
+	     * Byte 5-6: Manufacturer ID : 0x4c00 (Apple)
+	     * Byte 7: SubType: 0x2 (iBeacon)
+	     * Byte 8: SubType Length: 0x15
+	     * Byte 9-24: Proximity UUID
+	     * Byte 25-26: Major
+	     * Byte 27-28: Minor
+	     * Byte 29: Signal Power
+	     *
+	     * Manufacturer IDs
+	     * https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers
+	     */
+	    char payload[255]; // TODO Length
+	    char name[255];    // Use malloc
+	    if (adv_name_len == 0) {
+		name[0] = '\0';
+            } else {
+                memcpy(name, (char *)adv_name, adv_name_len);
+	    }
+	    // TODO split sprintf and/or use memcpy
+	    sprintf(payload, "{\"Name\":\"%s\",\"NameLen\":\"%d\",\"RSSI\":\"%d\",\"Length\":\"%d\",\"Type\":\"%02X\",\"ManufacturerID\":\"%02X%02X\",\"UUID\":\"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X\"}",
+			    name,
+			    adv_name_len,
+                            scan_result->scan_rst.rssi,
+			    scan_result->scan_rst.ble_adv[3],
+			    scan_result->scan_rst.ble_adv[4],
+			    scan_result->scan_rst.ble_adv[5],
+			    scan_result->scan_rst.ble_adv[6],
+	                    scan_result->scan_rst.ble_adv[9],
+			    scan_result->scan_rst.ble_adv[10],
+			    scan_result->scan_rst.ble_adv[11],
+			    scan_result->scan_rst.ble_adv[12],
+			    scan_result->scan_rst.ble_adv[13],
+			    scan_result->scan_rst.ble_adv[14],
+			    scan_result->scan_rst.ble_adv[15],
+			    scan_result->scan_rst.ble_adv[16],
+			    scan_result->scan_rst.ble_adv[17],
+			    scan_result->scan_rst.ble_adv[18],
+			    scan_result->scan_rst.ble_adv[19],
+			    scan_result->scan_rst.ble_adv[20],
+			    scan_result->scan_rst.ble_adv[21],
+			    scan_result->scan_rst.ble_adv[22],
+			    scan_result->scan_rst.ble_adv[23],
+			    scan_result->scan_rst.ble_adv[24]
+	            );
+	    ESP_LOGW(GATTC_TAG, "JSON: %s", payload);
+            mqtt_publish(mqtt_c, "/test", payload, strlen(payload), 0, 0);
+	    
+	    esp_log_buffer_char(GATTC_TAG, adv_name, adv_name_len);
             ESP_LOGI(GATTC_TAG, "\n");
             if (adv_name != NULL) {
                 if (strlen(remote_device_name) == adv_name_len && strncmp((char *)adv_name, remote_device_name, adv_name_len) == 0) {
@@ -432,15 +580,22 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
 {
     switch(event->event_id) {
     case SYSTEM_EVENT_STA_START:
+        ESP_LOGW(TAG_WIFI, "STAT_START");
         esp_wifi_connect();
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
-        ESP_LOGI(GATTC_TAG, "WIFI connected - IP:");
-        break;
+        ESP_LOGW(TAG_WIFI, "WIFI connected - IP:");
+        xEventGroupSetBits(network_event_group, WIFI_CONNECTED);
+	mqtt_c = mqtt_start(&settings);
+	break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         /* This is a workaround as ESP32 WiFi libs don't currently
            auto-reassociate. */
-        esp_wifi_connect();
+        xEventGroupClearBits(network_event_group, WIFI_CONNECTED | MQTT_CONNECTED);
+	mqtt_stop();
+	mqtt_c = NULL;
+	esp_wifi_connect();
+        ESP_LOGW(TAG_WIFI, "STA_DISCONNECTED");
         break;
     default:
         break;
@@ -452,6 +607,7 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
 static void initialise_wifi(void)
 {
     tcpip_adapter_init();
+    network_event_group = xEventGroupCreate(); // TODO Move it
     ESP_ERROR_CHECK( esp_event_loop_init(event_handler, NULL) );
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK( esp_wifi_init(&cfg) );
@@ -462,87 +618,13 @@ static void initialise_wifi(void)
             .password = EXAMPLE_WIFI_PASS,
         },
     };
-    ESP_LOGI(TAG, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
+    ESP_LOGW(TAG_WIFI, "Setting WiFi configuration SSID %s...", wifi_config.sta.ssid);
     ESP_ERROR_CHECK( esp_wifi_set_mode(WIFI_MODE_STA) );
     ESP_ERROR_CHECK( esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config) );
     ESP_ERROR_CHECK( esp_wifi_start() );
 }
 
 
-void connected_cb(mqtt_client *self, mqtt_event_data_t *params)
-{
-    mqtt_client *client = (mqtt_client *)self;
-    mqtt_subscribe(client, "/test", 0);
-    mqtt_publish(client, "/test", "howdy!", 6, 0, 0);
-}
-void disconnected_cb(mqtt_client *self, mqtt_event_data_t *params)
-{
-
-}
-void reconnect_cb(mqtt_client *self, mqtt_event_data_t *params)
-{
-
-}
-void subscribe_cb(mqtt_client *self, mqtt_event_data_t *params)
-{
-    ESP_LOGI(GATTC_TAG, "[APP] Subscribe ok, test publish msg");
-    mqtt_client *client = (mqtt_client *)self;
-    mqtt_publish(client, "/test", "abcde", 5, 0, 0);
-}
-
-void publish_cb(mqtt_client *self, mqtt_event_data_t *params)
-{
-
-}
-void data_cb(mqtt_client *self, mqtt_event_data_t *params)
-{
-    // TODO mqtt_client *client = (mqtt_client *)self;
-    mqtt_event_data_t *event_data = (mqtt_event_data_t *)params;
-
-    if(event_data->data_offset == 0) {
-
-        char *topic = malloc(event_data->topic_length + 1);
-        memcpy(topic, event_data->topic, event_data->topic_length);
-        topic[event_data->topic_length] = 0;
-        ESP_LOGI(GATTC_TAG, "[APP] Publish topic: %s", topic);
-        free(topic);
-    }
-
-    // char *data = malloc(event_data->data_length + 1);
-    // memcpy(data, event_data->data, event_data->data_length);
-    // data[event_data->data_length] = 0;
-    ESP_LOGI(GATTC_TAG, "[APP] Publish data[%d/%d bytes]",
-             event_data->data_length + event_data->data_offset,
-             event_data->data_total_length);
-    // data);
-
-    // free(data);
-
-}
-
-mqtt_settings settings = {
-    .host = "test.mosquitto.org",
-#if defined(CONFIG_MQTT_SECURITY_ON)
-    .port = 8883, // encrypted
-#else
-    .port = 1883, // unencrypted
-#endif
-    .client_id = "mqtt_client_id",
-    .username = "user",
-    .password = "pass",
-    .clean_session = 0,
-    .keepalive = 120,
-    .lwt_topic = "/lwt",
-    .lwt_msg = "offline",
-    .lwt_qos = 0,
-    .lwt_retain = 0,
-    .connected_cb = connected_cb,
-    .disconnected_cb = disconnected_cb,
-    // TODO .reconnect_cb = reconnect_cb,
-    .subscribe_cb = subscribe_cb,
-    .publish_cb = publish_cb,
-    .data_cb = data_cb
-};
 
 
 void app_main()
