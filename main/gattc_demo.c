@@ -467,15 +467,20 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
                 memcpy(name, (char *)adv_name, adv_name_len);
 	    }
 	    // TODO split sprintf and/or use memcpy
-	    sprintf(payload, "{\"Name\":\"%s\",\"NameLen\":\"%d\",\"RSSI\":\"%d\",\"Length\":\"%d\",\"Type\":\"%02X\",\"ManufacturerID\":\"%02X%02X\",\"UUID\":\"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X\"}",
+	    sprintf(payload, "{\"Name\":\"%s\",\"NameLen\":\"%d\",\"RSSI\":\"%d\",\"Length\":\"%d\",\"Type\":\"%02X\",\"ManufacturerID\":\"%02X%02X\",\"Subtype\":\"%02X\",\"SubLength\":\"%02X\",\"UUID\":\"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X\",\"Major\":\"%02X%02X\",\"Minor\":\"%02X%02X\"}",
 			    name,
 			    adv_name_len,
                             scan_result->scan_rst.rssi,
+			    scan_result->scan_rst.ble_adv[0],
+			    scan_result->scan_rst.ble_adv[1],
+			    scan_result->scan_rst.ble_adv[2],
 			    scan_result->scan_rst.ble_adv[3],
 			    scan_result->scan_rst.ble_adv[4],
 			    scan_result->scan_rst.ble_adv[5],
-			    scan_result->scan_rst.ble_adv[6],
-	                    scan_result->scan_rst.ble_adv[9],
+	                    scan_result->scan_rst.ble_adv[6],
+			    scan_result->scan_rst.ble_adv[7],
+			    scan_result->scan_rst.ble_adv[8],
+			    scan_result->scan_rst.ble_adv[9],
 			    scan_result->scan_rst.ble_adv[10],
 			    scan_result->scan_rst.ble_adv[11],
 			    scan_result->scan_rst.ble_adv[12],
@@ -490,7 +495,8 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
 			    scan_result->scan_rst.ble_adv[21],
 			    scan_result->scan_rst.ble_adv[22],
 			    scan_result->scan_rst.ble_adv[23],
-			    scan_result->scan_rst.ble_adv[24]
+			    scan_result->scan_rst.ble_adv[24],
+			    scan_result->scan_rst.ble_adv[25]
 	            );
 	    ESP_LOGW(GATTC_TAG, "JSON: %s", payload);
             mqtt_publish(mqtt_c, "/test", payload, strlen(payload), 0, 0);
