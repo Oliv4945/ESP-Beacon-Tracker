@@ -462,9 +462,10 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
 	    char payload[255]; // TODO Length
 	    char name[255];    // Use malloc
 	    if (adv_name_len == 0) {
-		name[0] = '\0';
-            } else {
-                memcpy(name, (char *)adv_name, adv_name_len);
+		    name[0] = '\0';
+        } else {
+		    name[adv_name_len] = '\0';
+            memcpy(name, (char *)adv_name, adv_name_len);
 	    }
 	    // TODO split sprintf and/or use memcpy
 	    sprintf(payload, "{\"Name\":\"%s\",\"NameLen\":\"%d\",\"RSSI\":\"%d\",\"Length\":\"%d\",\"Type\":\"%02X\",\"ManufacturerID\":\"%02X%02X\",\"Subtype\":\"%02X\",\"SubLength\":\"%02X\",\"UUID\":\"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X\",\"Major\":\"%02X%02X\",\"Minor\":\"%02X%02X\"}",
