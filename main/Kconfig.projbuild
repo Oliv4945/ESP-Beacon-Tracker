@@ -1,4 +1,4 @@
-menu "Wifi Configuration"
+menu "Network Configuration"
 
 config WIFI_SSID
     string "WiFi SSID"
@@ -13,5 +13,35 @@ config WIFI_PASSWORD
 		WiFi password (WPA or WPA2) for the example to use.
 
 		Can be left blank if the network has no security set.
+
+config MQTT_SERVER
+	string "MQTT Server"
+	default "domain.com"
+	help
+		Host or IP of the MQTT broker
+
+config MQTT_PORT
+	int "MQTT Port"
+	default 1883
+	help
+		MQTT port, usually 1883 or 8883 if secured MQTT
+
+config MQTT_USERNAME
+	string "MQTT Username"
+	default "username"
+	help
+		MQTT broker user name
+
+config MQTT_PASSWORD
+	string "MQTT Password"
+	default "password"
+	help
+		MQTT broker password
+
+config MQTT_CLIENT_ID
+	string "MQTT client ID"
+	default "mqtt_client_id"
+	help
+		Client ID, can be any string
 
 endmenu

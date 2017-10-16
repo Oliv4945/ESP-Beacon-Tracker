@@ -176,16 +176,14 @@ void data_cb(mqtt_client *self, mqtt_event_data_t *params)
 }
 
 mqtt_settings settings = {
-    .host = "HOST OR IP",
-#if defined(CONFIG_MQTT_SECURITY_ON)
-    .port = 8883, // encrypted
-#else
-
-    .port = 1883, // unencrypted
-#endif
+    .host = CONFIG_MQTT_SERVER,
+//#if defined(CONFIG_MQTT_SECURITY_ON)
+// TODO select CONFIG_MQTT_SECURITY_ON via Menuconfig
+    .port = CONFIG_MQTT_PORT,
+/*#else    .port = 1883, #endif */
     .client_id = "mqtt_client_id",
-    .username = "username",
-    .password = "password",
+    .username = CONFIG_MQTT_USERNAME,
+    .password = CONFIG_MQTT_PASSWORD,
     .clean_session = 0,
     .keepalive = 120,
     .lwt_topic = "/lwt",
