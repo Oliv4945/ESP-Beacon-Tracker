@@ -181,7 +181,7 @@ mqtt_settings settings = {
 // TODO select CONFIG_MQTT_SECURITY_ON via Menuconfig
     .port = CONFIG_MQTT_PORT,
 /*#else    .port = 1883, #endif */
-    .client_id = "mqtt_client_id",
+    .client_id = CONFIG_MQTT_CLIENT_ID,
     .username = CONFIG_MQTT_USERNAME,
     .password = CONFIG_MQTT_PASSWORD,
     .clean_session = 0,
@@ -443,64 +443,76 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
                                                 ESP_BLE_AD_TYPE_NAME_CMPL, &adv_name_len);
             ESP_LOGI(GATTC_TAG, "searched Device Name Len %d", adv_name_len);
             /* From Wikipedia
-	     *
-	     * Byte 3: Length: 0x1a
-	     * Byte 4: Type: 0xff (Custom Manufacturer Packet)
-	     * Byte 5-6: Manufacturer ID : 0x4c00 (Apple)
-	     * Byte 7: SubType: 0x2 (iBeacon)
-	     * Byte 8: SubType Length: 0x15
-	     * Byte 9-24: Proximity UUID
-	     * Byte 25-26: Major
-	     * Byte 27-28: Minor
-	     * Byte 29: Signal Power
-	     *
-	     * Manufacturer IDs
-	     * https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers
-	     */
-	    char payload[255]; // TODO Length
-	    char name[255];    // Use malloc
-	    if (adv_name_len == 0) {
-		    name[0] = '\0';
-        } else {
-		    name[adv_name_len] = '\0';
-            memcpy(name, (char *)adv_name, adv_name_len);
-	    }
-	    // TODO split sprintf and/or use memcpy
-	    sprintf(payload, "{\"Name\":\"%s\",\"NameLen\":\"%d\",\"RSSI\":\"%d\",\"Length\":\"%d\",\"Type\":\"%02X\",\"ManufacturerID\":\"%02X%02X\",\"Subtype\":\"%02X\",\"SubLength\":\"%02X\",\"UUID\":\"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X\",\"Major\":\"%02X%02X\",\"Minor\":\"%02X%02X\"}",
-			    name,
-			    adv_name_len,
-                            scan_result->scan_rst.rssi,
-			    scan_result->scan_rst.ble_adv[0],
-			    scan_result->scan_rst.ble_adv[1],
-			    scan_result->scan_rst.ble_adv[2],
-			    scan_result->scan_rst.ble_adv[3],
-			    scan_result->scan_rst.ble_adv[4],
-			    scan_result->scan_rst.ble_adv[5],
-	                    scan_result->scan_rst.ble_adv[6],
-			    scan_result->scan_rst.ble_adv[7],
-			    scan_result->scan_rst.ble_adv[8],
-			    scan_result->scan_rst.ble_adv[9],
-			    scan_result->scan_rst.ble_adv[10],
-			    scan_result->scan_rst.ble_adv[11],
-			    scan_result->scan_rst.ble_adv[12],
-			    scan_result->scan_rst.ble_adv[13],
-			    scan_result->scan_rst.ble_adv[14],
-			    scan_result->scan_rst.ble_adv[15],
-			    scan_result->scan_rst.ble_adv[16],
-			    scan_result->scan_rst.ble_adv[17],
-			    scan_result->scan_rst.ble_adv[18],
-			    scan_result->scan_rst.ble_adv[19],
-			    scan_result->scan_rst.ble_adv[20],
-			    scan_result->scan_rst.ble_adv[21],
-			    scan_result->scan_rst.ble_adv[22],
-			    scan_result->scan_rst.ble_adv[23],
-			    scan_result->scan_rst.ble_adv[24],
-			    scan_result->scan_rst.ble_adv[25]
-	            );
-	    ESP_LOGW(GATTC_TAG, "JSON: %s", payload);
+            *
+            * Byte 3: Length: 0x1a
+            * Byte 4: Type: 0xff (Custom Manufacturer Packet)
+            * Byte 5-6: Manufacturer ID : 0x4c00 (Apple)
+            * Byte 7: SubType: 0x2 (iBeacon)
+            * Byte 8: SubType Length: 0x15
+            * Byte 9-24: Proximity UUID
+            * Byte 25-26: Major
+            * Byte 27-28: Minor
+            * Byte 29: Signal Power
+            *
+            * Manufacturer IDs
+            * https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers
+            */
+            char payload[512]; // TODO Length
+            char name[255];    // Use malloc
+            int alt = 0;       // Fix to use Android Beacon Simulator
+            if (adv_name_len == 0) {
+                name[0] = '\0';
+            } else {
+                name[adv_name_len] = '\0';
+                memcpy(name, (char *)adv_name, adv_name_len);
+            }
+            if (scan_result->scan_rst.adv_data_len == 30) {
+                alt = 3;
+            }
+            // TODO split sprintf and/or use memcpy
+            sprintf(payload, "{\"Name\":\"%s\",\"NameLen\":\"%d\",\"RSSI\":\"%d\",\"Length\":\"%d\",\"Type\":\"%02X\",\"ManufacturerID\":\"%02X%02X\",\"Subtype\":\"%02X\",\"SubLength\":\"%02X\",\"UUID\":\"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X\",\"Major\":\"%02X%02X\",\"Minor\":\"%02X%02X\",\"bda\":\"%02X%02X%02X%02X%02X%02X\",\"DeviceType\":\"%d\",\"AdvDataLen\":\"%d\"}",
+                    name,
+                    adv_name_len,
+                    scan_result->scan_rst.rssi,
+                    scan_result->scan_rst.ble_adv[0+alt],
+                    scan_result->scan_rst.ble_adv[1+alt],
+                    scan_result->scan_rst.ble_adv[2+alt],
+                    scan_result->scan_rst.ble_adv[3+alt],
+                    scan_result->scan_rst.ble_adv[4+alt],
+                    scan_result->scan_rst.ble_adv[5+alt],
+                    scan_result->scan_rst.ble_adv[6+alt],
+                    scan_result->scan_rst.ble_adv[7+alt],
+                    scan_result->scan_rst.ble_adv[8+alt],
+                    scan_result->scan_rst.ble_adv[9+alt],
+                    scan_result->scan_rst.ble_adv[10+alt],
+                    scan_result->scan_rst.ble_adv[11+alt],
+                    scan_result->scan_rst.ble_adv[12+alt],
+                    scan_result->scan_rst.ble_adv[13+alt],
+                    scan_result->scan_rst.ble_adv[14+alt],
+                    scan_result->scan_rst.ble_adv[15+alt],
+                    scan_result->scan_rst.ble_adv[16+alt],
+                    scan_result->scan_rst.ble_adv[17+alt],
+                    scan_result->scan_rst.ble_adv[18+alt],
+                    scan_result->scan_rst.ble_adv[19+alt],
+                    scan_result->scan_rst.ble_adv[20+alt],
+                    scan_result->scan_rst.ble_adv[21+alt],
+                    scan_result->scan_rst.ble_adv[22+alt],
+                    scan_result->scan_rst.ble_adv[23+alt],
+                    scan_result->scan_rst.ble_adv[24+alt],
+                    scan_result->scan_rst.ble_adv[25+alt],
+                    scan_result->scan_rst.bda[0],
+                    scan_result->scan_rst.bda[1],
+                    scan_result->scan_rst.bda[2],
+                    scan_result->scan_rst.bda[3],
+                    scan_result->scan_rst.bda[4],
+                    scan_result->scan_rst.bda[5],
+                    scan_result->scan_rst.dev_type,
+                    scan_result->scan_rst.adv_data_len
+            );
+            ESP_LOGW(GATTC_TAG, "JSON: %s", payload);
             mqtt_publish(mqtt_c, "/test", payload, strlen(payload), 0, 0);
-	    
-	    esp_log_buffer_char(GATTC_TAG, adv_name, adv_name_len);
+            
+            esp_log_buffer_char(GATTC_TAG, adv_name, adv_name_len);
             ESP_LOGI(GATTC_TAG, "\n");
             if (adv_name != NULL) {
                 if (strlen(remote_device_name) == adv_name_len && strncmp((char *)adv_name, remote_device_name, adv_name_len) == 0) {
