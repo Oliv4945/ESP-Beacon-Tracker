@@ -33,6 +33,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/task.h"
 
 #include "esp_wifi.h"
 #include "esp_event_loop.h"
@@ -57,6 +58,9 @@
 #define PROFILE_A_APP_ID 0
 #define INVALID_HANDLE   0
 
+#define SCAN_FREQUENCY_MS 10000
+#define SCAN_DURATION_S   3 
+
 /* The examples use simple WiFi configuration that you can set via
    'make menuconfig'.
    If you'd rather not, just change the below entries to strings with
@@ -71,6 +75,10 @@ static esp_gattc_char_elem_t *char_elem_result   = NULL;
 static esp_gattc_descr_elem_t *descr_elem_result = NULL;
 
 mqtt_client *mqtt_c = NULL;
+
+//the unit of the duration is second
+// TODO: Really need to be global ?
+uint32_t duration = 3;
 
 // FreeRTOS event group to signal when we are connected & ready to send data
 EventGroupHandle_t network_event_group;
@@ -409,6 +417,21 @@ static void gattc_profile_event_handler(esp_gattc_cb_event_t event, esp_gatt_if_
     }
 }
 
+static void esp_ble_gap_start_scanning_wrapper( void * pvParameters )
+{
+    TickType_t xLastWakeTime;
+   
+    // Initialise the xLastWakeTime variable with the current time.
+    xLastWakeTime = xTaskGetTickCount( );
+
+    while( 1 )
+    {
+        esp_ble_gap_start_scanning( SCAN_DURATION_S );
+        // Wait for the next cycle.
+        vTaskDelayUntil( &xLastWakeTime, SCAN_FREQUENCY_MS/portTICK_PERIOD_MS );
+    }
+}
+
 static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
     uint8_t *adv_name = NULL;
@@ -418,9 +441,17 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
         // TODO infinite timeout on return value
         xEventGroupWaitBits(network_event_group, WIFI_CONNECTED | MQTT_CONNECTED, false, true, 0xFFFF);
         ESP_LOGW(GATTC_TAG, "Starting scan");
-        //the unit of the duration is second
-	uint32_t duration = 3;
-	esp_ble_gap_start_scanning(duration);
+        // Create FreeRTOS task
+        // TODO - Task stack size
+        xTaskCreatePinnedToCore(
+                &esp_ble_gap_start_scanning_wrapper,  /* Function to call            */
+                "scanning_wrapper",                   /* Name - 16 char max          */
+                1000,                                 /* Allocated stacks in words   */
+                NULL,                                 /* Parameters                  */
+                5,                                    /* Priority (Low: 0, High: TBC)*/
+                NULL,                                 /* Task handle                 */
+                1                                     /* Assigned to app core        */
+            );
         break;
     }
     case ESP_GAP_BLE_SCAN_START_COMPLETE_EVT:
@@ -508,7 +539,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
                 );
                 ESP_LOGW(GATTC_TAG, "JSON: %s", payload);
                 mqtt_publish(mqtt_c, "/test", payload, strlen(payload), 0, 0);
-                
+
                 ESP_LOGI(GATTC_TAG, "\n");
                 break;
             case ESP_GAP_SEARCH_INQ_CMPL_EVT:
@@ -525,6 +556,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
             break;
         }
         ESP_LOGI(GATTC_TAG, "stop scan successfully");
+        
         break;
 
     case ESP_GAP_BLE_ADV_STOP_COMPLETE_EVT:
