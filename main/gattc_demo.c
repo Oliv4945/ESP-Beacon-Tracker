@@ -65,7 +65,6 @@
 #define EXAMPLE_WIFI_SSID CONFIG_WIFI_SSID
 #define EXAMPLE_WIFI_PASS CONFIG_WIFI_PASSWORD
 
-static const char remote_device_name[] = "ESP_GATTS_DEMO";
 static bool connect    = false;
 static bool get_server = false;
 static esp_gattc_char_elem_t *char_elem_result   = NULL;
@@ -510,19 +509,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
                 ESP_LOGW(GATTC_TAG, "JSON: %s", payload);
                 mqtt_publish(mqtt_c, "/test", payload, strlen(payload), 0, 0);
                 
-                esp_log_buffer_char(GATTC_TAG, adv_name, adv_name_len);
                 ESP_LOGI(GATTC_TAG, "\n");
-                if (adv_name != NULL) {
-                    if (strlen(remote_device_name) == adv_name_len && strncmp((char *)adv_name, remote_device_name, adv_name_len) == 0) {
-                        ESP_LOGI(GATTC_TAG, "searched device %s\n", remote_device_name);
-                        if (connect == false) {
-                            connect = true;
-                            ESP_LOGI(GATTC_TAG, "connect to the remote device.");
-                            esp_ble_gap_stop_scanning();
-                            esp_ble_gattc_open(gl_profile_tab[PROFILE_A_APP_ID].gattc_if, scan_result->scan_rst.bda, true);
-                        }
-                    }
-                }
                 break;
             case ESP_GAP_SEARCH_INQ_CMPL_EVT:
                 break;
