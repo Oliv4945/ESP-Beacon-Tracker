@@ -14,6 +14,7 @@ Installation
   * `Component config`
     * `Bluetooth`->`Bluedroid Bluetooth stack enabled` to activate `GATT client module(GATTC)`
     * `FreeRTOS`->`FreeRTOS assertions` select `Print and continue failed assertions`
+    * `Partition Table` -> Select `Custom partition CSV file`
 
 Be carreful with the last line `Print and continue failed assertions`, it is required as `vTaskDelayUntil()` is considered as "not yet tested" by Espressif team, see [here](https://github.com/espressif/esp-idf/issues/391).
 
