@@ -49,6 +49,8 @@
 #include "esp_bt_main.h"
 #include "esp_gatt_common_api.h"
 
+#include "fota.h"
+
 #define GATTC_TAG "GATTC_DEMO"
 #define TAG_WIFI "WIFI"
 #define TAG_MQTT "MQTT"
@@ -58,7 +60,7 @@
 #define PROFILE_A_APP_ID 0
 #define INVALID_HANDLE   0
 
-#define SCAN_FREQUENCY_MS 10000
+#define SCAN_FREQUENCY_MS 30000
 #define SCAN_DURATION_S   3 
 
 /* The examples use simple WiFi configuration that you can set via
@@ -129,9 +131,10 @@ struct gattc_profile_inst {
 void connected_cb(mqtt_client *self, mqtt_event_data_t *params)
 {
     xEventGroupSetBits(network_event_group, MQTT_CONNECTED);
-    ESP_LOGW(TAG_MQTT, "Connected_cb");
+    ESP_LOGW(TAG_MQTT, "Connected_cb - Subscribing");
     mqtt_client *client = (mqtt_client *)self;
-    mqtt_subscribe(client, "/test", 0);
+    // mqtt_subscribe(client, "/test", 0);
+    mqtt_subscribe(client, "/fota/firmware", 0);
     // mqtt_publish(client, "/test", "howdy!", 6, 0, 0);
 }
 void disconnected_cb(mqtt_client *self, mqtt_event_data_t *params)
@@ -167,19 +170,23 @@ void data_cb(mqtt_client *self, mqtt_event_data_t *params)
         memcpy(topic, event_data->topic, event_data->topic_length);
         topic[event_data->topic_length] = 0;
         ESP_LOGI(GATTC_TAG, "[APP] Publish topic: %s", topic);
+
+        char *data = malloc(event_data->data_length + 1);
+        memcpy(data, event_data->data, event_data->data_length);
+        data[event_data->data_length] = 0;
+        /*
+        ESP_LOGI(GATTC_TAG, "[APP] Publish data[%d/%d bytes] - %s",
+                event_data->data_length + event_data->data_offset,
+                event_data->data_total_length, data);
+        */
+        if (strcmp(topic, "/fota/firmware") == 0) {
+            fota_update(data);
+        }
+        /*
+        free(data);
+        */
         free(topic);
     }
-
-    // char *data = malloc(event_data->data_length + 1);
-    // memcpy(data, event_data->data, event_data->data_length);
-    // data[event_data->data_length] = 0;
-    ESP_LOGI(GATTC_TAG, "[APP] Publish data[%d/%d bytes]",
-             event_data->data_length + event_data->data_offset,
-             event_data->data_total_length);
-    // data);
-
-    // free(data);
-
 }
 
 mqtt_settings settings = {
@@ -443,6 +450,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
         ESP_LOGW(GATTC_TAG, "Starting scan");
         // Create FreeRTOS task
         // TODO - Task stack size
+        
         xTaskCreatePinnedToCore(
                 &esp_ble_gap_start_scanning_wrapper,  /* Function to call            */
                 "scanning_wrapper",                   /* Name - 16 char max          */
