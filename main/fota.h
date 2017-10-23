@@ -37,6 +37,6 @@ void __attribute__((noreturn)) fota_task_fatal_error();
 /*
  * Example from ESP-IDF for now
  */
-void fota_update_task(void *pvParameter);
+void fota_update_task( void );
 
 #endif

@@ -16,13 +16,13 @@ int socketId = -1;
 char http_request[64] = {0};
 
 
-uint8_t fota_update(char *url) {
-    ESP_LOGI(TAG_FOTA, "Start updating with %s", url);
-    xTaskCreatePinnedToCore(&fota_update_task, "fota_update_task", 8192, NULL, 4, NULL, 1);
+uint8_t fota_update( char *url ) {
+    ESP_LOGI( TAG_FOTA, "Start updating with %s", url );
+    fota_update_task( );
     return 0;
 }
 
-void fota_update_task(void *pvParameter) {
+void fota_update_task( void ) {
     esp_err_t err;
     /* update handle : set by esp_ota_begin(), must be freed via esp_ota_end() */
     esp_ota_handle_t update_handle = 0 ;
@@ -129,15 +129,11 @@ void fota_update_task(void *pvParameter) {
 
 
 
-void __attribute__((noreturn)) fota_task_fatal_error()
+void __attribute__(( noreturn )) fota_task_fatal_error( )
 {
-   ESP_LOGE(TAG_FOTA, "Exiting task due to fatal error...");
-   close(socketId);
-   (void)vTaskDelete(NULL);
-
-   while (1) {
-       ;
-   }
+   ESP_LOGE( TAG_FOTA, "Restaring task due to fatal error..." );
+   close( socketId );
+   esp_restart( );
 }
 
 int fota_read_until(char *buffer, char delim, int len) {
@@ -178,7 +174,7 @@ bool fota_read_past_http_header(char text[], int total_len, esp_ota_handle_t upd
 
 bool fota_connect_to_http_server()
 {
-   // TODO: Use fota_update()
+   // TODO: Use fota_update parameters()
    ESP_LOGI(TAG_FOTA, "Server IP: %s Server Port:%s", "192.168.1.10", "8080");
    sprintf(http_request, "GET %s HTTP/1.1\r\nHost: %s:%s \r\n\r\n", "BLE_Tracker.bin", "192.168.1.10", "8080");
 
