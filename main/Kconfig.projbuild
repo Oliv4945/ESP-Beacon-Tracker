@@ -2,9 +2,9 @@ menu "Network Configuration"
 
 config ESP_NAME
     string "ESP Name"
-        default "ESP32 Name"
+        default "ESP32_Name_"
         help
-                Friendly name
+                Friendly name, last IP byte will be appended
 
 config WIFI_SSID
     string "WiFi SSID"
@@ -43,11 +43,5 @@ config MQTT_PASSWORD
 	default "password"
 	help
 		MQTT broker password
-
-config MQTT_CLIENT_ID
-	string "MQTT client ID"
-	default "mqtt_client_id"
-	help
-		Client ID, can be any string
 
 endmenu

@@ -75,6 +75,7 @@ static bool connect    = false;
 static bool get_server = false;
 static esp_gattc_char_elem_t *char_elem_result   = NULL;
 static esp_gattc_descr_elem_t *descr_elem_result = NULL;
+static uint8_t ipLastByte = 0;
 
 mqtt_client *mqtt_c = NULL;
 
@@ -507,7 +508,7 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
                 }
                 // TODO split sprintf and/or use memcpy
                 sprintf(payload, "{\"EspName\":\"%s\",\"Name\":\"%s\",\"NameLen\":\"%d\",\"RSSI\":\"%d\",\"Length\":\"%d\",\"Type\":\"%02X\",\"ManufacturerID\":\"%02X%02X\",\"Subtype\":\"%02X\",\"SubLength\":\"%02X\",\"UUID\":\"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X\",\"Major\":\"%02X%02X\",\"Minor\":\"%02X%02X\",\"bda\":\"%02X%02X%02X%02X%02X%02X\",\"DeviceType\":\"%d\",\"AdvDataLen\":\"%d\"}",
-                        CONFIG_ESP_NAME,
+                        settings.client_id,
                         name,
                         adv_name_len,
                         scan_result->scan_rst.rssi,
@@ -626,10 +627,13 @@ static esp_err_t event_handler(void *ctx, system_event_t *event)
         ESP_LOGW(TAG_WIFI, "STAT_START");
         esp_wifi_connect();
         break;
-    case SYSTEM_EVENT_STA_GOT_IP:
-        ESP_LOGW(TAG_WIFI, "WIFI connected - IP:");
+    case SYSTEM_EVENT_STA_GOT_IP: 
+        ipLastByte = (uint8_t)(event->event_info.got_ip.ip_info.ip.addr >> 24 & 0xFF);
+        ESP_LOGW(TAG_WIFI, "WIFI connected - IP: .%d", ipLastByte);
         xEventGroupSetBits(network_event_group, WIFI_CONNECTED);
-	mqtt_c = mqtt_start(&settings);
+        // /!\ Careful, might be more than client_id size;
+        itoa(ipLastByte, settings.client_id + strlen(settings.client_id), 10 );
+	    mqtt_c = mqtt_start(&settings);
 	break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         /* This is a workaround as ESP32 WiFi libs don't currently
