@@ -195,7 +195,7 @@ mqtt_settings settings = {
 // TODO select CONFIG_MQTT_SECURITY_ON via Menuconfig
     .port = CONFIG_MQTT_PORT,
 /*#else    .port = 1883, #endif */
-    .client_id = CONFIG_MQTT_CLIENT_ID,
+    .client_id = CONFIG_ESP_NAME,
     .username = CONFIG_MQTT_USERNAME,
     .password = CONFIG_MQTT_PASSWORD,
     .clean_session = 0,
@@ -506,7 +506,8 @@ static void esp_gap_cb(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *par
                     alt = 3;
                 }
                 // TODO split sprintf and/or use memcpy
-                sprintf(payload, "{\"Name\":\"%s\",\"NameLen\":\"%d\",\"RSSI\":\"%d\",\"Length\":\"%d\",\"Type\":\"%02X\",\"ManufacturerID\":\"%02X%02X\",\"Subtype\":\"%02X\",\"SubLength\":\"%02X\",\"UUID\":\"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X\",\"Major\":\"%02X%02X\",\"Minor\":\"%02X%02X\",\"bda\":\"%02X%02X%02X%02X%02X%02X\",\"DeviceType\":\"%d\",\"AdvDataLen\":\"%d\"}",
+                sprintf(payload, "{\"EspName\":\"%s\",\"Name\":\"%s\",\"NameLen\":\"%d\",\"RSSI\":\"%d\",\"Length\":\"%d\",\"Type\":\"%02X\",\"ManufacturerID\":\"%02X%02X\",\"Subtype\":\"%02X\",\"SubLength\":\"%02X\",\"UUID\":\"%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X\",\"Major\":\"%02X%02X\",\"Minor\":\"%02X%02X\",\"bda\":\"%02X%02X%02X%02X%02X%02X\",\"DeviceType\":\"%d\",\"AdvDataLen\":\"%d\"}",
+                        CONFIG_ESP_NAME,
                         name,
                         adv_name_len,
                         scan_result->scan_rst.rssi,

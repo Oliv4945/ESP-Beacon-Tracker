@@ -1,5 +1,11 @@
 menu "Network Configuration"
 
+config ESP_NAME
+    string "ESP Name"
+        default "ESP32 Name"
+        help
+                Friendly name
+
 config WIFI_SSID
     string "WiFi SSID"
 	default "myssid"
