@@ -7,16 +7,14 @@ Work in progress to implement an BLE sniffer sending packets through MQTT
 Installation
 ------------
 
-* Install ESP32 toolchain as described [here](https://esp-idf.readthedocs.io/en/latest/get-started/linux-setup.html). I currently use [1.22.0-73](https://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-73-ge28a011-5.2.0.tar.gz)
-* Clone esp-idf and set its `IDF_PATH` environment variable. I use this specific [commit](https://github.com/espressif/esp-idf/tree/de750e99214a51c1bcfdb42b5ada931652a3c531), close to v2.1
+* Install ESP32 toolchain as described [here](https://esp-idf.readthedocs.io/en/latest/get-started/linux-setup.html). I currently use [1.22.0-75](http://dl.espressif.com/dl/xtensa-esp32-elf-linux64-1.22.0-75-gbaf03c2-5.2.0.tar.gz)
+* Clone esp-idf and set its `IDF_PATH` environment variable. I use this specific [commit](https://github.com/espressif/esp-idf/tree/02304ad83e0a5f4815789d581446fa3afdd017b9), close to v2.1
 * Run `make menuconfig`
   * `Network configuration` to configure WiFi and MQTT
   * `Component config`
     * `Bluetooth`->`Bluedroid Bluetooth stack enabled` to activate `GATT client module(GATTC)`
-    * `FreeRTOS`->`FreeRTOS assertions` select `Print and continue failed assertions`
     * `Partition Table` -> Select `Custom partition CSV file`
 
-Be carreful with the last line `Print and continue failed assertions`, it is required as `vTaskDelayUntil()` is considered as "not yet tested" by Espressif team, see [here](https://github.com/espressif/esp-idf/issues/391).
 
 Configuration
 -------------
