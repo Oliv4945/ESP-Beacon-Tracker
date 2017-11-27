@@ -1,0 +1,57 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "type": "shell",
+    "options": {
+        "cwd": "${workspaceRoot}"
+    },
+    "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+    },
+    "tasks": [
+        {
+            "label": "all",
+            "problemMatcher": "$gcc",
+            "command": "export PATH=$PATH:${workspaceRoot}/../toolchain/xtensa-esp32-elf/bin && export IDF_PATH=${workspaceRoot}/../toolchain/esp-idf && make -j4",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "flash",
+            "command": "export PATH=$PATH:${workspaceRoot}/../toolchain/xtensa-esp32-elf/bin && export IDF_PATH=${workspaceRoot}/../toolchain/esp-idf && make -j4 flash",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "clean",
+            "command": "export PATH=$PATH:${workspaceRoot}/../toolchain/xtensa-esp32-elf/bin && export IDF_PATH=${workspaceRoot}/../toolchain/esp-idf && make -j4 clean",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "monitor",
+            "command": "export PATH=$PATH:${workspaceRoot}/../toolchain/xtensa-esp32-elf/bin && export IDF_PATH=${workspaceRoot}/../toolchain/esp-idf && make -j4 monitor",
+            "problemMatcher": "$gcc",
+            "presentation": {
+                "focus": true
+            }
+        },
+        {
+            "label": "menuconfig",
+            "command": "export PATH=$PATH:${workspaceRoot}/../toolchain/xtensa-esp32-elf/bin && export IDF_PATH=${workspaceRoot}/../toolchain/esp-idf && make -j4 menuconfig",
+            "problemMatcher": "$gcc",
+            "presentation": {
+                "focus": true
+            }
+        },
+        {
+            "label": "defconfig",
+            "command": "export PATH=$PATH:${workspaceRoot}/../toolchain/xtensa-esp32-elf/bin && export IDF_PATH=${workspaceRoot}/../toolchain/esp-idf && make -j4 defconfig",
+            "problemMatcher": "$gcc"
+        }
+    ]
+}
