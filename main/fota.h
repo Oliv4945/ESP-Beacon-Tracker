@@ -1,5 +1,5 @@
 #ifndef __FOTA_H__
-#define __NETWORK_H__
+#define __FOTA_H__
 
 // Includes
 #include <stdint.h>
