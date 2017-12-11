@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
+// cd build
+// ../../toolchain/esp-idf/components/esptool_py/esptool/esptool.py --port /dev/ttyUSB1 write_flash --flash_mode dio --flash_freq 40m --flash_size detect 0x1000 bootloader/bootloader.bin 0x10000 BLE_Tracker.bin 0x8000 partitions.bin
 
 /****************************************************************************
 *
@@ -61,7 +62,7 @@
 #define INVALID_HANDLE   0
 
 #define SCAN_FREQUENCY_MS 30000
-#define SCAN_DURATION_S   3 
+#define SCAN_DURATION_S   3
 
 
 static bool connect    = false;
@@ -141,47 +142,46 @@ void disconnected_cb( mqtt_client *self, mqtt_event_data_t *params ) {
 void reconnect_cb( mqtt_client *self, mqtt_event_data_t *params ) {
 }
 
-
-void subscribe_cb(mqtt_client *self, mqtt_event_data_t *params)
-{
-    ESP_LOGW(TAG_MQTT, "[APP] Subscribe ok, test publish msg");
-    mqtt_client *client = (mqtt_client *)self;
-    mqtt_publish(client, "/test", "abcde", 5, 0, 0);
+/*
+ * Called after each topic subscription
+ */
+void subscribe_cb( mqtt_client *self, mqtt_event_data_t *params ) {
+    ESP_LOGI( TAG_MQTT, "Subscribe OK" );
 }
 
-void publish_cb(mqtt_client *self, mqtt_event_data_t *params)
-{
-    ESP_LOGW(TAG_MQTT, "Publish_cb");
-    mqtt_client *client = (mqtt_client *)self;
-    mqtt_publish(client, "/test", "abcde", 5, 0, 0);
+/*
+ * Called each time a message is published
+ */
+void publish_cb( mqtt_client *self, mqtt_event_data_t *params ) {
+    ESP_LOGI( TAG_MQTT, "Published" );
 }
-void data_cb(mqtt_client *self, mqtt_event_data_t *params)
-{
-    // TODO mqtt_client *client = (mqtt_client *)self;
-    mqtt_event_data_t *event_data = (mqtt_event_data_t *)params;
 
-    if(event_data->data_offset == 0) {
+/*
+ * Called for each message received on subscribed topics
+ */
+void data_cb( mqtt_client *self, mqtt_event_data_t *params ) {
+    mqtt_event_data_t *event_data = (mqtt_event_data_t *) params;
 
-        char *topic = malloc(event_data->topic_length + 1);
-        memcpy(topic, event_data->topic, event_data->topic_length);
-        topic[event_data->topic_length] = 0;
-        ESP_LOGI(TAG_TRACKER, "[APP] Publish topic: %s", topic);
+    if ( event_data->data_offset == 0 ) { // TODO - Why ?
+        char *topic = malloc( event_data->topic_length + 1 );
+        memcpy( topic, event_data->topic, event_data->topic_length );
+        topic[event_data->topic_length] = 0; //  TODO - Why ?
+        ESP_LOGI( TAG_MQTT, "Published on topic: %s", topic );
 
-        char *data = malloc(event_data->data_length + 1);
-        memcpy(data, event_data->data, event_data->data_length);
-        data[event_data->data_length] = 0;
+        char *data = malloc( event_data->data_length + 1 );
+        memcpy( data, event_data->data, event_data->data_length );
+        data[event_data->data_length] = 0; //  TODO - Why ?
         /*
-        ESP_LOGI(TAG_TRACKER, "[APP] Publish data[%d/%d bytes] - %s",
-                event_data->data_length + event_data->data_offset,
-                event_data->data_total_length, data);
+        ESP_LOGI( TAG_MQTT, "Published data[%d/%d bytes] - %s",
+                    event_data->data_length + event_data->data_offset,
+                    event_data->data_total_length, data
+                );
         */
-        if (strcmp(topic, "/fota/firmware") == 0) {
-            fota_update(data);
+        if ( strcmp( topic, "/fota/firmware" ) == 0 ) {
+            fota_update( data );
         }
-        /*
-        free(data);
-        */
-        free(topic);
+        free( data ); // TODO - Avoid on OTA ?
+        free( topic );
     }
 }
 
